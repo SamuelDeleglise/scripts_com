@@ -10,6 +10,11 @@ vsa = instrument("vsa")
 afg_fb=instrument("AFG_CHI")
 osc = instrument("Atchoum")
 
+label_phase='A'
+label_int='B'
+label_cs='C'
+label_IQ='D'
+
 class RunCOM(QtGui.QWidget):
     def __init__(self, default_sleep=10, default_sleep_lock_time=10000, default_gain=-400, default_angle=177, default_lock_pt=0):
         super(RunCOM, self).__init__()

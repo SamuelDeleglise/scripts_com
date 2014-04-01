@@ -4,6 +4,12 @@ from pyinstruments.curvestore import models
 import gc
 import math
 from matplotlib.pyplot import figure
+from curve import Curve
+
+label_phase='A'
+label_int='B'
+label_cs='C'
+label_IQ='D'
 	
 
 class Run:
@@ -165,6 +171,14 @@ def conv_cor_huge(idmin, idmax,exclude=None):
 	del mean_cs
 	gc.collect()
 	return data_cs/prod
+
+def convert_IQ(cs_IQ, spectrum, imped=50.):
+	data=pd.Series(index = spectrum.data.index, data = cs_IQ.data.index+1j*cs_IQ.data.values)
+	c = Curve()
+	c.set_params(**cs_IQ.params)
+	data=data/imped*(c.params["bandwidth"])**2
+	c.set_data(data)
+	return c
 
 def mask(c, exclude):
 	exclude_points = lambda c,min_freq,max_freq: (c.data.index<min_freq) | (c.data.index>max_freq)
