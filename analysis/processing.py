@@ -3,59 +3,71 @@ import numpy as np
 from pyinstruments.curvestore import models
 import gc
 import math
-from matplotlib.pyplot import figure
+from matplotlib.pyplot import figure,scatter
+from matplotlib.cm import cool
 from curve import Curve
 
-label_phase='A'
-label_int='B'
-label_cs='C'
-label_IQ='D'
+from scripts_com.common import *
 	
 
 class Run:
 	def __init__(self,idmin, idmax):
 		runs=range(idmin,idmax+1)
 		curves = models.CurveDB.objects.filter_tag("runCOM").filter_param("id", value__in=runs)
-		self.curves_pha = curves.filter_param("trace_label",value='A')
-		self.curves_int = curves.filter_param("trace_label",value='B')
-		self.curves_cs = curves.filter_param("trace_label",value='C')
-		self.curves_cs_lock_re = curves.filter_param("trace_label",value='G')
-		self.curves_cs_lock_im = curves.filter_param("trace_label",value='H')
+		self.curves_pha = curves.filter_param("trace_label",value=label_pha)
+		self.curves_int = curves.filter_param("trace_label",value=label_int)
+		self.curves_cs = curves.filter_param("trace_label",value=label_cs)
+		self.curves_iq = curves.filter_param("trace_label",value=label_iq)
+		self.get_cs_iq()
+		
+	def get_cs_iq(self):
+		c_cs_iq=[]
+		for c1,c2 in zip( self.curves_iq, self.curves_cs ):
+			c_cs_iq.append( convert_IQ(c1, c2) )
+		self.curves_cs_iq = c_cs_iq
+
+def conv(Curves, exclude=None,cplx=False):
+	mean=[]
+	rms=[]
+	m=mask(Curves[0], exclude)
+	if not cplx:
+		for c in Curves:
+			mean.append( c.data[m].mean() )
+			rms.append( c.params["current_average"] )
+		data=pd.Series(mean,index=rms)
+		return data
+	else:
+		for c in Curves:
+			mean.append( c.data[m].real.mean()+1j*c.data[m].imag.mean() )
+			rms.append( c.params["current_average"] )
+		data=pd.Series(mean,index=rms)
+		return data
 
 def conv_cs(Run, exclude=None):
-	mean_cs=[]
-	rms_cs=[]
-	m=mask(Run.curves_pha[0], exclude)
-	for c in Run.curves_cs:
-		mean=c.data[m].mean()
-		rms=c.params["current_average"]
-		mean_cs.append(mean)
-		rms_cs.append(rms)
-	data=pd.Series(mean_cs,index=rms_cs)
-	return data
+	return conv(Run.curves_cs, exclude)
+
+def conv_cs_iq(Run, exclude=None):
+	return conv(Run.curves_cs_iq, exclude, cplx=True)
+
+def conv_pha(Run, exclude=None):
+	return conv(Run.curves_pha, exclude)
+
+def conv_int(Run, exclude=None):
+	return conv(Run.curves_int, exclude)
 
 def conv_lock(Run):
-	lock_point_re=[]
-	lock_point_im=[]
-	rms_cs_re=[]
-	rms_cs_im=[]
+	lock_point=[]
+	rms=[]
 	angles=[]
-	for c in Run.curves_cs_lock_re:
-		re=c.data[(c.data.size-1)/2]
-		rms=c.params["current_average"]
-		lock_point_re.append(re)
-		rms_cs_re.append(rms)
-		angles.append(float(c.params["angle"]))
-	lock_re=pd.Series(lock_point_re,index=rms_cs_re)
-	angles=pd.Series(angles,index=rms_cs_re)
-	for c in Run.curves_cs_lock_im:
-		im=c.data[(c.data.size-1)/2]
-		rms=c.params["current_average"]
-		lock_point_im.append(im)
-		rms_cs_im.append(rms)
-	lock_im=pd.Series(lock_point_im,index=rms_cs_im)
-	lock=np.cos(np.radians(angles))*lock_re+np.sin(np.radians(angles))*lock_im
-	return lock
+	for c1,c2 in zip( Run.curves_cs_iq, Run.curves_pha):
+		freq = get_mmode_freq(c2)
+		test = test_mod_freq(freq,c2)
+		rms.append(c1.params["current_average"])
+		lock_point.append(c1.data[freq])
+		angles.append(float(c1.params["angle"]))
+	lock=pd.Series(lock_point,index=rms)
+	angles=pd.Series(angles,index=rms)
+	return np.cos(np.radians(angles))*lock.real + np.sin(np.radians(angles))*lock.imag
 
 def conv_cor(Run, exclude=None):
 	mean_cs=[]
@@ -86,33 +98,11 @@ def conv_cor(Run, exclude=None):
 	data=data_cs/np.sqrt(data_pha*data_int)
 	return data
 
-def conv_cor_IQ(Run, exclude=None):
-	mean_cs=[]
-	mean_pha=[]
-	mean_int=[]
-	rms=[]
-	m=mask(Run.curves_pha[0], exclude)
-	for c in Run.curves_cs:
-		cs=c.data[m].mean()
-		cur_rms=c.params["current_average"]
-		mean_cs.append(cs)
-		rms.append(cur_rms)
-	data_cs=pd.Series(mean_cs,index=rms)
-	rms=[]
-	for c in Run.curves_pha:
-		pha=c.data[m].mean()
-		cur_rms=c.params["current_average"]
-		mean_pha.append(pha)
-		rms.append(cur_rms)
-	data_pha=pd.Series(mean_pha,index=rms)
-	rms=[]
-	for c in Run.curves_int:
-		int=c.data[m].mean()
-		cur_rms=c.params["current_average"]
-		mean_int.append(int)
-		rms.append(cur_rms)
-	data_int=pd.Series(mean_int,index=rms)
-	data=data_cs/np.sqrt(data_pha*data_int)
+def conv_cor_iq(Run, exclude=None):
+	data_cs_iq=conv_cs_iq(Run, exclude)
+	data_pha=conv_pha(Run, exclude)
+	data_int=conv_int(Run, exclude)
+	data=data_cs_iq/np.sqrt(data_pha*data_int)
 	return data
 
 def conv_cor_huge(idmin, idmax,exclude=None):
@@ -172,14 +162,6 @@ def conv_cor_huge(idmin, idmax,exclude=None):
 	gc.collect()
 	return data_cs/prod
 
-def convert_IQ(cs_IQ, spectrum, imped=50.):
-	data=pd.Series(index = spectrum.data.index, data = cs_IQ.data.index+1j*cs_IQ.data.values)
-	c = Curve()
-	c.set_params(**cs_IQ.params)
-	data=data/imped*(c.params["bandwidth"])**2
-	c.set_data(data)
-	return c
-
 def mask(c, exclude):
 	exclude_points = lambda c,min_freq,max_freq: (c.data.index<min_freq) | (c.data.index>max_freq)
 	mask=pd.Series(True,index=c.data.index)
@@ -188,13 +170,83 @@ def mask(c, exclude):
 			mask = exclude_points(c,freqs[0],freqs[1])*mask
 	return mask
 
-def full_analysis(Run, exclude=None):
+def growing_windows(s,numbers=100, num_strt_pt=100):
+	mean=s.size/2
+	num_pt=np.logspace(np.log2(num_strt_pt), np.log2(s.size), num=numbers, base=2)
+	windows=[]
+	for n in num_pt:
+		windows.append([ [ 0, s.index[mean-n/2] ], [ s.index[mean+n/2],  np.finfo(np.float64).max] ])
+	return windows
+
+def growing(c, numbers=100, exclude=None, num_strt_pt=100):
+	av=[]
+	num=[]
+	m=mask(c, exclude)
+	windows=growing_windows(c.data[m], numbers,num_strt_pt=num_strt_pt)
+	for w,n in zip( windows, range(len(windows)) ):
+		if exclude is not None:
+			e=list(exclude)
+			e.append(w[0])
+			e.append(w[1])
+			m2=mask( c, exclude=e )
+		else:
+			m2=mask( c, w )
+		av.append( c.data[m2].real.mean() + 1j*c.data[m2].imag.mean() )
+		num.append(n)
+	return pd.Series(av, index=num)
+
+def growing_cs_iq(Run, numbers=100, exclude=None, num_strt_pt=100):
+	data=[]
+	for c in Run.curves_cs_iq:
+		data.append( growing(c, numbers, exclude, num_strt_pt=num_strt_pt) )
+	return data
+
+def conv_iq(Run, numbers=100, exclude=None, num_strt_pt=100):
+	data=[]
+	m=mask(Run.curves_cs_iq[0], exclude)
+	windows=growing_windows(Run.curves_cs_iq[0].data[m], numbers,num_strt_pt=num_strt_pt)
+	for w in windows:
+		if exclude is not None:
+			e=list(exclude)
+		else:
+			e=[]
+		e.append(w[0])
+		e.append(w[1])
+		data.append( conv_cs_iq(Run, exclude=e) )
+	return data
+
+def plot_conv_iq(Run, numbers=100, exclude=None, num_strt_pt=100):
+	figure("plot_conv_iq")
+	data=conv_iq(Run, numbers=numbers, exclude=exclude, num_strt_pt=num_strt_pt)
+	for d,n in zip( data, range(len(data)) ):
+		d.abs().plot( c=cool( float(n)/len(data)) )
+	
+
+def plot_growing_cs_iq(Run, numbers=100, exclude=None,num_strt_pt=100):
+	figure()
+	data=growing_cs_iq(Run, numbers=numbers, exclude=exclude, num_strt_pt=num_strt_pt)
+	for d,n in zip( data, range(len(data)) ):
+		d.abs().plot(c=cool( float(n)/len(data)) )
+
+def full_analysis(Run, numbers=100, exclude=None, num_strt_pt=100):
 	cor = conv_cor(Run,exclude)
-	f_cor=figure("Correlations")
+	f_cor=figure("Correlations (phaseless)")
 	cor.plot()
 	cs = conv_cs(Run,exclude)
-	f_cs=figure("Cross Spectrum")
+	f_cs=figure("Cross Spectrum (phaseless)")
 	cs.plot()
 	lock = conv_lock(Run)
 	f_lock=figure("Lock")
 	lock.plot()
+	cs_iq=conv_cs_iq(Run,exclude)
+	f_cs_iq_norm=figure("Cross Spectrum IQ Norm")
+	cs_iq.abs().plot()
+	f_cs_iq=figure("Cross Spectrum IQ")
+	scatter(cs_iq.real,cs_iq.imag,[[range(cs_iq.size)]])
+	f_cor_iq_norm=figure("Correlations IQ Norm")
+	cor_iq=conv_cor_iq(Run,exclude)
+	cor_iq.abs().plot()
+	f_cor_iq=figure("Correlations IQ")
+	scatter(cor_iq.real,cor_iq.imag,[[range(cor_iq.size)]])
+	plot_growing_cs_iq(Run, numbers=numbers, exclude=exclude,num_strt_pt=num_strt_pt)
+	plot_conv_iq(Run, numbers=numbers, exclude=exclude,num_strt_pt=num_strt_pt)

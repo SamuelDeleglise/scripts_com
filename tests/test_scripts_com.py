@@ -7,12 +7,7 @@ from pyinstruments.pyhardwaredb import instrument
 vsa = instrument("vsa")
 
 from scripts_com.analysis import convert_IQ
-from scripts_com.common import get_mmode_freq
-
-label_phase='A'
-label_int='B'
-label_cs='C'
-label_IQ='D'
+from scripts_com.common import *
 
 class TestCrossSpectrum(TestCase):
 
@@ -32,7 +27,7 @@ class TestCrossSpectrum(TestCase):
 class TestLock(TestCase):
 
     def setUp(self):
-        vsa.active_label = label_phase
+        vsa.active_label = label_pha
         self.c_phase = vsa.get_curve()
         vsa.active_label = label_int
         self.c_int = vsa.get_curve()

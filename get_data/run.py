@@ -6,17 +6,14 @@ import curve
 import pandas as p
 import math
 
+from scripts_com.common import *
+
 vsa = instrument("vsa")
 afg_fb=instrument("AFG_CHI")
 osc = instrument("Atchoum")
 
-label_phase='A'
-label_int='B'
-label_cs='C'
-label_IQ='D'
-
-class RunCOM(QtGui.QWidget):
-    def __init__(self, default_sleep=10, default_sleep_lock_time=10000, default_gain=-400, default_angle=177, default_lock_pt=0):
+class RunCOM(QtGui.QWidget, object):
+    def __init__(self, default_sleep=10, default_sleep_lock_time=10000, default_gain=-40, default_angle=-123, default_lock_pt=0, default_mod_freq=1.1287e6):
         super(RunCOM, self).__init__()
         self.tags = [self.get_current_tag()]
         self.timer = QtCore.QTimer()
@@ -77,6 +74,9 @@ class RunCOM(QtGui.QWidget):
         self.button_stop_lock = QtGui.QPushButton("Stop")
         self.button_stop_lock.clicked.connect(self.button_stop_lock_clicked)
         
+        self.mod_freq_label = QtGui.QLabel('Modulation Freq (Hz)')
+        self.mod_freq_line = QtGui.QLineEdit(str(default_mod_freq))
+        
         self.hlay1 = QtGui.QHBoxLayout()
         self.hlay1.addWidget(self.label_acq)
         self.hlay1.addStretch(1)
@@ -117,6 +117,11 @@ class RunCOM(QtGui.QWidget):
         self.hlay7.addStretch(1)
         self.hlay7.addWidget(self.angle_label)
         self.hlay7.addWidget(self.angle_box)
+        
+        self.hlay8 = QtGui.QHBoxLayout()
+        self.hlay8.addWidget(self.mod_freq_label)
+        self.hlay8.addStretch(1)
+        self.hlay8.addWidget(self.mod_freq_line)
 
         self.v_lay = QtGui.QVBoxLayout()
         self.v_lay.addLayout(self.hlay1)
@@ -125,6 +130,7 @@ class RunCOM(QtGui.QWidget):
         self.v_lay.addLayout(self.hlay6)
         self.v_lay.addLayout(self.hlay3)
         self.v_lay.addLayout(self.hlay7)
+        self.v_lay.addLayout(self.hlay8)
         self.v_lay.addLayout(self.hlay4)
         self.setLayout(self.v_lay)
         self.setWindowTitle("runCOM")
@@ -172,19 +178,17 @@ class RunCOM(QtGui.QWidget):
         curve.params["power"] = self.power
         curve.params["angle"] = self.angle
         curve.params["lock"] = self.lock_pt
+        curve.params["mod"] = self.mod_freq
         curve.save()
         
     def take_data(self):
         print 'taking data'
         vsa.pause()
         n_av = vsa.current_average("C") # bug du vsa, seuls les cross-spectra ont le bon RMS
-        self.take_curve('A',n_av)
-        self.take_curve('B',n_av)
-        self.take_curve('C',n_av)
-        self.take_curve('E',n_av)
-        self.take_curve('F',n_av)
-        self.take_curve('G',n_av)
-        self.take_curve('H',n_av)
+        self.take_curve(label_pha,n_av)
+        self.take_curve(label_int,n_av)
+        self.take_curve(label_cs,n_av)
+        self.take_curve(label_iq,n_av)
         if self.isAuto:
             self.sleep_time=self.sleep_time*2
         self.timer.setInterval(1000*self.sleep_time)
@@ -239,6 +243,21 @@ class RunCOM(QtGui.QWidget):
             print "invalid lock point"
 
     @property
+    def mod_freq(self):
+        while True:
+            try:
+                return float(self.mod_freq_line.text())
+            except ValueError:
+                print "invalid modulation frequency"
+
+    @mod_freq.setter
+    def mod_freq(self,val):
+        try:
+            self.mod_freq_line.setText(str(val))
+        except ValueError:
+            print "invalid modulation frequency"
+
+    @property
     def power(self):
         return self.power_box.value()
     
@@ -276,16 +295,21 @@ class RunCOM(QtGui.QWidget):
 
     @property
     def intgr(self):
-        vsa.active_label='G'
-        c_re=vsa.get_curve()
-        vsa.active_label='H'
-        c_im=vsa.get_curve()
-        re = c_re.data[(c_re.data.size-1)/2]
-        im = c_im.data[(c_im.data.size-1)/2]
+        vsa.active_label=label_iq
+        c_iq=vsa.get_curve()
+        vsa.active_label=label_pha
+        c_phase=vsa.get_curve()
+        freq=get_mmode_freq(c_phase)
+        bw = c_phase.params["bandwidth"]
+        expc_freq = self.mod_freq
+        if ( (freq>(bw+expc_freq) ) or (freq<(-bw+expc_freq) ) ):
+            print "Error determining modulatation frequency: expected freq is %g while determined one %g is within a %d Hz bw"%(expc_freq,freq,bw)
+        c_iq=convert_IQ( c_iq, c_phase )
+        pt = c_iq.data[freq]
+        re = pt.real
+        im = pt.imag
         intgr = math.cos(math.radians(self.angle))*re+math.sin(math.radians(self.angle))*im
-        return intgr*vsa.current_average('C')
-#        return -im
-#        return norm*vsa.current_average()*signe_re
+        return intgr*vsa.current_average(label_pha)
 
     def apply_cor(self,cor):
         afg_fb.sc.channel_idx=2
@@ -295,8 +319,8 @@ class RunCOM(QtGui.QWidget):
         print "Locking"
         gain_fb=-self.gain*self.sleep_lock_time
         cur_intgr=self.intgr
-        n_av=vsa.current_average('C')
-        cor=-gain_fb*(cur_intgr-self.lock_pt*n_av)*1e1+self.residual_offset
+        n_av=vsa.current_average(label_pha)
+        cor=-gain_fb*(cur_intgr-self.lock_pt*n_av)*1e-2+self.residual_offset
         if cor>5:
             cor=5
         if cor<-5:
