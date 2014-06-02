@@ -3,11 +3,12 @@ from pyinstruments.curvestore import models
 
 import time
 from PyQt4 import QtCore, QtGui
+from scripts_com.common import *
 
 vsa = instrument("vsa")
 
 class Acquisition(QtGui.QWidget):
-    def __init__(self, default_sleep=500, resume=True, auto=True):
+    def __init__(self, type="debug", default_sleep=500, resume=True, auto=True):
         self.tags = [self.get_current_tag()]
         super(Acquisition, self).__init__()
         self.timer = QtCore.QTimer()
@@ -48,6 +49,7 @@ class Acquisition(QtGui.QWidget):
         self.sleep_time = default_sleep
         self.is_resume=resume
         self.isAuto=auto
+        self.type=type
         self.show()
         
     def take_curve(self, label):
@@ -61,9 +63,10 @@ class Acquisition(QtGui.QWidget):
     def take_one_point(self):
         print 'taking_one_point'
         vsa.pause()
-        self.take_curve('A')
-        self.take_curve('B')
-        self.take_curve('C')
+        self.take_curve(label_pha)
+        self.take_curve(label_int)
+        self.take_curve(label_cs)
+        self.take_curve(label_iq)
         if self.isAuto:
             self.sleep_time=2*self.sleep_time
         self.timer.setInterval(self.sleep_time)
@@ -95,7 +98,7 @@ class Acquisition(QtGui.QWidget):
         return self.checkbox_auto.setCheckState(2*val)
     
     def get_current_tag(self):
-        existing = models.Tag.objects.filter(name__startswith="average_coss")
+        existing = models.Tag.objects.filter(name__startswith=self.type)
         num_max = 0
         for tag in existing:
             num_str = tag.name.split("/")[-1]
@@ -105,7 +108,7 @@ class Acquisition(QtGui.QWidget):
                 pass
             else:
                 num_max = max(num_max, num)
-        return "average_coss/%04i"%(num_max+1)
+        return self.type+"%04i"%(num_max+1)
     
     def change_interval(self, val):
         self.timer.setInterval(val)
@@ -120,9 +123,4 @@ class Acquisition(QtGui.QWidget):
     def button_stop_clicked(self):
         self.timer.stop()
         
-class Analysis:
-    def __init__(self, num):
-        curves = models.CurveDB.objects.filter_tag("average_coss/%04i"%(num)).filter_param("data_name", value="Cross Spectrum")
-        for curve in curves:
-            pass
         

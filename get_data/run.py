@@ -41,7 +41,7 @@ class RunCOM(QtGui.QWidget, object):
         
         self.checkbox_restart = QtGui.QCheckBox("Restart averaging on start")
         
-        self.label_lock_time = QtGui.QLabel('lock duty time (ms)')
+        self.label_lock_time = QtGui.QLabel('lock every N (ms)')
         self.sleep_time_lock_box = QtGui.QSpinBox() 
         self.sleep_time_lock_box.setMaximum(int(1e9))
         self.sleep_time_lock_box.setValue(default_sleep_lock_time)
