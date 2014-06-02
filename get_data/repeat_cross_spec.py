@@ -7,7 +7,7 @@ from PyQt4 import QtCore, QtGui
 vsa = instrument("vsa")
 
 class Acquisition(QtGui.QWidget):
-    def __init__(self, default_sleep=100):
+    def __init__(self, default_sleep=500, resume=True, auto=True):
         self.tags = [self.get_current_tag()]
         super(Acquisition, self).__init__()
         self.timer = QtCore.QTimer()
@@ -25,8 +25,9 @@ class Acquisition(QtGui.QWidget):
         self.sleep_time_box = QtGui.QSpinBox() 
         self.sleep_time_box.setMaximum(int(1e9))
         
-        self.checkbox_restart = QtGui.QCheckBox()
-        self.checkbox_restart_label = QtGui.QLabel("Restart averaging on start")
+        self.checkbox_resume = QtGui.QCheckBox("Resume ?")
+        
+        self.checkbox_auto = QtGui.QCheckBox("Auto ?")
         
         self.v_lay = QtGui.QVBoxLayout()
         self.lay = QtGui.QHBoxLayout()
@@ -34,18 +35,19 @@ class Acquisition(QtGui.QWidget):
         self.lay.addWidget(self.button_stop)
         self.lay.addWidget(self.label)
         self.lay.addWidget(self.sleep_time_box)
+        self.lay.addWidget(self.checkbox_auto)
         
         self.v_lay.addLayout(self.lay)
         self.hlay2 = QtGui.QHBoxLayout()
-        self.hlay2.addWidget(self.checkbox_restart)
-        self.hlay2.addWidget(self.checkbox_restart_label)
+        self.hlay2.addWidget(self.checkbox_resume)
         self.v_lay.addLayout(self.hlay2)
                             
         
         self.setLayout(self.v_lay)
         
         self.sleep_time = default_sleep
-        self.is_restart = True
+        self.is_resume=resume
+        self.isAuto=auto
         self.show()
         
     def take_curve(self, label):
@@ -62,7 +64,8 @@ class Acquisition(QtGui.QWidget):
         self.take_curve('A')
         self.take_curve('B')
         self.take_curve('C')
-        
+        if self.isAuto:
+            self.sleep_time=2*self.sleep_time
         self.timer.setInterval(self.sleep_time)
         vsa.resume()
         self.timer.start()
@@ -76,12 +79,20 @@ class Acquisition(QtGui.QWidget):
         self.sleep_time_box.setValue(val)
     
     @property
-    def is_restart(self):
-        return self.checkbox_restart.checkState()==2
+    def is_resume(self):
+        return self.checkbox_resume.checkState()==2
 
-    @is_restart.setter
-    def is_restart(self, val):
-        return self.checkbox_restart.setCheckState(val*2)
+    @is_resume.setter
+    def is_resume(self, val):
+        return self.checkbox_resume.setCheckState(val*2)
+    
+    @property
+    def isAuto(self):
+        return bool(self.checkbox_auto.checkState())
+
+    @isAuto.setter
+    def isAuto(self, val):
+        return self.checkbox_auto.setCheckState(2*val)
     
     def get_current_tag(self):
         existing = models.Tag.objects.filter(name__startswith="average_coss")
@@ -100,7 +111,9 @@ class Acquisition(QtGui.QWidget):
         self.timer.setInterval(val)
       
     def button_start_clicked(self):
-        if self.is_restart:
+        if self.is_resume:
+            vsa.resume()
+        else:
             vsa.restart()
         self.timer.start()
         

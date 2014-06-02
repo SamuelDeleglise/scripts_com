@@ -1,2 +1,2 @@
 from run import RunCOM
-from run import Watch_lock
+from repeat_cross_spec import Acquisition

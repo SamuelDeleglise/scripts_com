@@ -11,9 +11,9 @@ from scripts_com.common import *
 	
 
 class Run:
-	def __init__(self,idmin, idmax):
+	def __init__(self,idmin, idmax, type="runCOM"):
 		runs=range(idmin,idmax+1)
-		curves = models.CurveDB.objects.filter_tag("runCOM").filter_param("id", value__in=runs)
+		curves = models.CurveDB.objects.filter_tag(type).filter(id__in=runs)#filter_param("id", value__in=runs)
 		self.curves_pha = curves.filter_param("trace_label",value=label_pha)
 		self.curves_int = curves.filter_param("trace_label",value=label_int)
 		self.curves_cs = curves.filter_param("trace_label",value=label_cs)
@@ -22,9 +22,16 @@ class Run:
 		
 	def get_cs_iq(self):
 		c_cs_iq=[]
-		for c1,c2 in zip( self.curves_iq, self.curves_cs ):
+		for c1,c2 in zip( self.curves_iq, self.curves_pha ):
 			c_cs_iq.append( convert_IQ(c1, c2) )
 		self.curves_cs_iq = c_cs_iq
+		
+class SingleRun(Run):
+	def __init__(self,id_pha, id_int, id_iq):
+		self.curves_pha = [models.CurveDB.objects.get(id=id_pha)]
+		self.curves_int = [models.CurveDB.objects.get(id=id_int)]
+		self.curves_iq = [models.CurveDB.objects.get(id=id_iq)]
+		self.get_cs_iq()
 
 def conv(Curves, exclude=None,cplx=False):
 	mean=[]
@@ -227,6 +234,36 @@ def plot_growing_cs_iq(Run, numbers=100, exclude=None,num_strt_pt=100):
 	data=growing_cs_iq(Run, numbers=numbers, exclude=exclude, num_strt_pt=num_strt_pt)
 	for d,n in zip( data, range(len(data)) ):
 		d.abs().plot(c=cool( float(n)/len(data)) )
+		
+def cor_vs_freq(Run, av_freq=1e3):
+	windows=[]
+	f1=Run.curves_cs_iq[0].data.index[0]
+	f2=Run.curves_cs_iq[0].data.index[-1]
+	rng=f2-f1
+	n_pt=int(rng/av_freq)
+	for n in range(n_pt):
+		a = f1+n*av_freq
+		b = a+av_freq
+		windows.append([a, b])
+	data_iq=[]
+	data_pha=[]
+	data_int=[]
+	freqs=[]
+	for w in windows:
+		print w[0]
+		ex=[ [0,w[0]], [w[1],np.finfo(np.float64).max] ]
+		m=mask(Run.curves_cs_iq[0], ex)
+		l=len( Run.curves_pha )
+		data_iq.append( Run.curves_cs_iq[l-1].data[m].real.mean() +1j*Run.curves_cs_iq[-1].data[m].imag.mean())
+		data_pha.append( Run.curves_pha[l-1].data[m].mean() )
+		data_int.append( Run.curves_int[l-1].data[m].mean() )
+		freqs.append((w[0]+w[1])/2.)
+	i=pd.Series(data_int, index=freqs)
+	p=pd.Series(data_pha, index=freqs)
+	iq=pd.Series(data_iq, index=freqs)
+	return iq/np.sqrt(i*p)
+
+
 
 def full_analysis(Run, numbers=100, exclude=None, num_strt_pt=100):
 	cor = conv_cor(Run,exclude)
