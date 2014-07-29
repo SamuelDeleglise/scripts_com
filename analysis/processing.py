@@ -32,6 +32,16 @@ class SingleRun(Run):
 		self.curves_int = [models.CurveDB.objects.get(id=id_int)]
 		self.curves_iq = [models.CurveDB.objects.get(id=id_iq)]
 		self.get_cs_iq()
+		self.get_cor()
+		
+	def get_cor(self):
+		self.cor=self.curves_cs_iq[0].data/np.sqrt(self.curves_pha[0].data*self.curves_int[0].data)
+	
+	def get_cs_iq(self):
+		c_cs_iq=[]
+		for c1,c2 in zip( self.curves_iq, self.curves_pha ):
+			c_cs_iq.append( convert_IQ(c1, c2) )
+		self.curves_cs_iq = c_cs_iq
 
 def conv(Curves, exclude=None,cplx=False):
 	mean=[]
@@ -41,14 +51,12 @@ def conv(Curves, exclude=None,cplx=False):
 		for c in Curves:
 			mean.append( c.data[m].mean() )
 			rms.append( c.params["current_average"] )
-		data=pd.Series(mean,index=rms)
-		return data
 	else:
 		for c in Curves:
 			mean.append( c.data[m].real.mean()+1j*c.data[m].imag.mean() )
 			rms.append( c.params["current_average"] )
-		data=pd.Series(mean,index=rms)
-		return data
+	data=pd.Series(mean,index=rms)
+	return data
 
 def conv_cs(Run, exclude=None):
 	return conv(Run.curves_cs, exclude)
@@ -88,19 +96,13 @@ def conv_cor(Run, exclude=None):
 		mean_cs.append(cs)
 		rms.append(cur_rms)
 	data_cs=pd.Series(mean_cs,index=rms)
-	rms=[]
 	for c in Run.curves_pha:
 		pha=c.data[m].mean()
-		cur_rms=c.params["current_average"]
 		mean_pha.append(pha)
-		rms.append(cur_rms)
 	data_pha=pd.Series(mean_pha,index=rms)
-	rms=[]
 	for c in Run.curves_int:
 		int=c.data[m].mean()
-		cur_rms=c.params["current_average"]
 		mean_int.append(int)
-		rms.append(cur_rms)
 	data_int=pd.Series(mean_int,index=rms)
 	data=data_cs/np.sqrt(data_pha*data_int)
 	return data
@@ -109,6 +111,8 @@ def conv_cor_iq(Run, exclude=None):
 	data_cs_iq=conv_cs_iq(Run, exclude)
 	data_pha=conv_pha(Run, exclude)
 	data_int=conv_int(Run, exclude)
+	data_pha.index=data_cs_iq.index
+	data_int.index=data_cs_iq.index
 	data=data_cs_iq/np.sqrt(data_pha*data_int)
 	return data
 
@@ -235,7 +239,7 @@ def plot_growing_cs_iq(Run, numbers=100, exclude=None,num_strt_pt=100):
 	for d,n in zip( data, range(len(data)) ):
 		d.abs().plot(c=cool( float(n)/len(data)) )
 		
-def cor_vs_freq(Run, av_freq=1e3):
+def cor_vs_freq(Run, av_freq=1e4):
 	windows=[]
 	f1=Run.curves_cs_iq[0].data.index[0]
 	f2=Run.curves_cs_iq[0].data.index[-1]

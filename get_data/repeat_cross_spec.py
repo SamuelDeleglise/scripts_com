@@ -8,8 +8,10 @@ from scripts_com.common import *
 vsa = instrument("vsa")
 
 class Acquisition(QtGui.QWidget):
-    def __init__(self, type="debug", default_sleep=500, resume=True, auto=True):
+    def __init__(self, type="debug", comment=None, default_sleep=500, resume=True, auto=True):
+        self.type=str(type)
         self.tags = [self.get_current_tag()]
+        self.comment=comment
         super(Acquisition, self).__init__()
         self.timer = QtCore.QTimer()
         self.timer.setSingleShot(True)
@@ -49,7 +51,7 @@ class Acquisition(QtGui.QWidget):
         self.sleep_time = default_sleep
         self.is_resume=resume
         self.isAuto=auto
-        self.type=type
+#        self.type=str(type)
         self.show()
         
     def take_curve(self, label):
@@ -58,6 +60,8 @@ class Acquisition(QtGui.QWidget):
         curve.tags+= self.tags
         curve.params["name"] = curve.params["data_name"] + "_" +\
                                 str(curve.params["current_average"])
+        if self.comment is not None:
+            curve.params["comment"]=self.comment
         curve.save()
         
     def take_one_point(self):
@@ -108,7 +112,7 @@ class Acquisition(QtGui.QWidget):
                 pass
             else:
                 num_max = max(num_max, num)
-        return self.type+"%04i"%(num_max+1)
+        return self.type+"/%04i"%(num_max+1)
     
     def change_interval(self, val):
         self.timer.setInterval(val)
@@ -117,6 +121,7 @@ class Acquisition(QtGui.QWidget):
         if self.is_resume:
             vsa.resume()
         else:
+            self.tags=[self.get_current_tag()]
             vsa.restart()
         self.timer.start()
         
