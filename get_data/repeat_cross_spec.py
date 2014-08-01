@@ -8,10 +8,11 @@ from scripts_com.common import *
 vsa = instrument("vsa")
 
 class Acquisition(QtGui.QWidget):
-    def __init__(self, type="debug", comment=None, default_sleep=500, resume=True, auto=True):
+    def __init__(self, type="debug", comment='', default_sleep=500, resume=True, auto=True, parent=None):
         self.type=str(type)
         self.tags = [self.get_current_tag()]
         self.comment=comment
+        self.get_parent(parent)
         super(Acquisition, self).__init__()
         self.timer = QtCore.QTimer()
         self.timer.setSingleShot(True)
@@ -60,8 +61,8 @@ class Acquisition(QtGui.QWidget):
         curve.tags+= self.tags
         curve.params["name"] = curve.params["data_name"] + "_" +\
                                 str(curve.params["current_average"])
-        if self.comment is not None:
-            curve.params["comment"]=self.comment
+        curve.params["comment"]=self.comment
+        curve.move(self.parent_crv)
         curve.save()
         
     def take_one_point(self):
@@ -127,5 +128,16 @@ class Acquisition(QtGui.QWidget):
         
     def button_stop_clicked(self):
         self.timer.stop()
+    
+    def get_parent(self,parent):
+        if parent is None:
+            prt=models.CurveDB()
+            prt.name='correlations'
+            prt.params["comment"]=self.comment
+            prt.tags+=[self.type]
+            prt.save()
+            self.parent_crv=prt
+        else:
+            self.parent_crv=models.CurveDB.objects.get(id=parent)
         
         

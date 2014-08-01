@@ -241,8 +241,8 @@ def plot_growing_cs_iq(Run, numbers=100, exclude=None,num_strt_pt=100):
 		
 def cor_vs_freq(Run, av_freq=1e4):
 	windows=[]
-	f1=Run.curves_cs_iq[0].data.index[0]
-	f2=Run.curves_cs_iq[0].data.index[-1]
+	f1 = Run.curves_cs_iq[0].data.index[0]
+	f2 = Run.curves_cs_iq[0].data.index[-1]
 	rng=f2-f1
 	n_pt=int(rng/av_freq)
 	for n in range(n_pt):
