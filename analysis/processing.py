@@ -240,28 +240,31 @@ def plot_growing_cs_iq(Run, numbers=100, exclude=None,num_strt_pt=100):
 		d.abs().plot(c=cool( float(n)/len(data)) )
 		
 def cor_vs_freq(Run, av_freq=1e4):
-	windows=[]
+	"""correlations versus frequency for the last data in run"""
+	#f min
 	f1 = Run.curves_cs_iq[0].data.index[0]
+	#f max
 	f2 = Run.curves_cs_iq[0].data.index[-1]
-	rng=f2-f1
+	rng = f2-f1
 	n_pt=int(rng/av_freq)
-	for n in range(n_pt):
-		a = f1+n*av_freq
-		b = a+av_freq
-		windows.append([a, b])
+	windows,spc=np.linspace(f1,f2,n_pt,retstep=True,endpoint=False)
+#	for n in range(n_pt):
+#		a = f1+n*av_freq
+#		b = a+av_freq
+#		windows.append([a, b])
 	data_iq=[]
 	data_pha=[]
 	data_int=[]
 	freqs=[]
 	for w in windows:
-		print w[0]
-		ex=[ [0,w[0]], [w[1],np.finfo(np.float64).max] ]
-		m=mask(Run.curves_cs_iq[0], ex)
+		print w
+#		ex=[ [0,w[0]], [w[1],np.finfo(np.float64).max] ]
+#		m=mask(Run.curves_cs_iq[0], ex)
 		l=len( Run.curves_pha )
-		data_iq.append( Run.curves_cs_iq[l-1].data[m].real.mean() +1j*Run.curves_cs_iq[-1].data[m].imag.mean())
-		data_pha.append( Run.curves_pha[l-1].data[m].mean() )
-		data_int.append( Run.curves_int[l-1].data[m].mean() )
-		freqs.append((w[0]+w[1])/2.)
+		data_iq.append( Run.curves_cs_iq[l-1].data[w:w+spc].real.mean() +1j*Run.curves_cs_iq[l-1].data[w:w+spc].imag.mean())
+		data_pha.append( Run.curves_pha[l-1].data[w:w+spc].mean() )
+		data_int.append( Run.curves_int[l-1].data[w:w+spc].mean() )
+		freqs.append(w+spc/2.)
 	i=pd.Series(data_int, index=freqs)
 	p=pd.Series(data_pha, index=freqs)
 	iq=pd.Series(data_iq, index=freqs)

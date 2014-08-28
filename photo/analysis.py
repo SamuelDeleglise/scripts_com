@@ -2,8 +2,9 @@ from pyinstruments.curvestore import models
 from scripts_com.analysis.processing import cor_vs_freq, SingleRun
 from pandas import  *
 from scipy.optimize import curve_fit
+from pylab import show, figure, plot, legend
 
-def analyze(parent_id, av_freq=1e4):
+def analyze( parent_id, av_freq=1e4, keep_fit=[1e6,2e6] ):
     """return the power where classical noise equal quantum noise"""
     cp=models.CurveDB.objects.get(id=parent_id)
     childs=cp.childs.filter_param("name", value__contains="power")
@@ -31,16 +32,26 @@ def analyze(parent_id, av_freq=1e4):
     df=DataFrame(df_dict,index=correlations[0].index,columns=labels)
     freqs=[]
     pshot=[]
-    for i in range(0,df[df.columns[0]].size):
-        freqs.append(df.ix[i].name)
-        pshot.append( fitPower(df.ix[i]) )
-    c_shot=Series(data=pshot,index=freqs)
+    for i in range(0, df[df.columns[0]].size ):
+        freqs.append( df.ix[i].name )
+        pshot.append( fitPower(df.ix[i],av_freq, *keep_fit) )
+    c_shot=Series( data=pshot, index=freqs )
     return c_shot,df
 
 def fitFunc(t,lbd):
     return lbd*t/(lbd*t+2)
 
-def fitPower(s):
+def fitPower(s,av_freq=None, *args):
+    '''Will plot fits for freqs in args within av_freq'''
     ind=np.array(s.index,dtype=float)
     fitparams,fitcov=curve_fit(fitFunc,ind,s.values)
+    for freq in args:
+#        print s.name, freq, (freq<(s.name+av_freq)), (freq>(s.name-av_freq))
+        if (freq<(s.name+av_freq/2.) and freq>(s.name-av_freq/2.)):
+            print "keep fit for freq "+str(freq)
+            figure( str(s.name) )
+            plot( ind, fitFunc(ind,fitparams[0]) ,label='fit' )
+            plot( ind, s.values, label='data' )
+            legend()
+            show()
     return 1/fitparams[0]
