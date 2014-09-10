@@ -14,7 +14,8 @@ def n_vs_cf(stp=0, srt=10.,npt=100, n_avg=100, vsa_chan="A", afg_='Obelix/2', os
     afg.waveform = 'DC'
     print "Getting the scope"
     oscl = instrument(oscl_.split("/")[0])
-    oscl.channel_idx = int(afg_.split("/")[1])
+    oscl.channel_idx = int(oscl_.split("/")[1])
+#    oscl.channel_idx=4
     print "Getting vsa"
     vsa = instrument("vsa")
     vsa.active_label = vsa_chan
@@ -37,6 +38,7 @@ def take_curve(v, prt_crv, vsa, oscl):
     prt.move(prt_crv)
     prt.save()
     curve = vsa.get_curve()
+#    oscl.channel_idx=4
     curve2 = oscl.get_curve()
     curve.params["name"] = "Noise_%.3f"%(v)+"V"
     curve2.params["name"] = "Int_%.3f"%(v)+"V"
