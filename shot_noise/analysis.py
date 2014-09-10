@@ -3,6 +3,8 @@ from scripts_com.analysis.processing import cor_vs_freq, SingleRun
 from pandas import  *
 from scipy.optimize import curve_fit
 from pylab import show, figure, plot, legend
+from math import sqrt, fabs
+import numpy as np
 
 def analyze( parent_id, av_freq=1e4, keep_fit=[1e6,2e6] ):
     """return the power where classical noise equal quantum noise"""
@@ -55,3 +57,14 @@ def fitPower(s,av_freq=None, *args):
             legend()
             show()
     return 1/fitparams[0]
+
+def guess_correls(parent_id, pump_power, probe_power, lo_power, gain_imba=1e-3, av_freq=1e4):
+    p_shot,grbg = analyze( parent_id, av_freq=av_freq)
+    c_noise = pump_power/p_shot
+    cors=sqrt(gain_imba)*fabs((probe_power-lo_power))/sqrt(pump_power*lo_power)
+    cors=cors*c_noise/np.sqrt(1+c_noise)
+    return cors
+
+    
+    
+    
