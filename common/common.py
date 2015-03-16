@@ -9,7 +9,7 @@ label_cs='C'
 label_iq='D'
 
 def get_mmode_freq(curve_phase):
-    return curve_phase.data.idxmax()
+    return curve_phase.data[9e5:].idxmax()
 
 def convert_IQ(cs_IQ, spectrum, imped=50.):
     data = pd.Series(index=spectrum.data.index, data=array(cs_IQ.data.index, dtype=float64) + 1j*cs_IQ.data.values)

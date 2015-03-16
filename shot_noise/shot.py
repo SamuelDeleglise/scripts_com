@@ -24,7 +24,7 @@ class Shot(QtGui.QWidget):
         self.power_label = QtGui.QLabel('input power (mW)')
         self.power_box = QtGui.QDoubleSpinBox()
         self.power_box.setMinimum(0.)
-        self.power_box.setMaximum(20.)
+        self.power_box.setMaximum(30.)
         self.power_box.setSingleStep(0.1)
 
         self.v_lay = QtGui.QVBoxLayout()

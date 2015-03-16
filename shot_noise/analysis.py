@@ -35,8 +35,8 @@ def analyze( parent_id, av_freq=1e4, keep_fit=[1e6,2e6] ):
     freqs=[]
     pshot=[]
     for i in range(0, df[df.columns[0]].size ):
-        freqs.append( df.ix[i].name )
-        pshot.append( fitPower(df.ix[i],av_freq, *keep_fit) )
+        freqs.append( df.iloc[i].name )
+        pshot.append( fitPower(df.iloc[i],av_freq, *keep_fit) )
     c_shot=Series( data=pshot, index=freqs )
     return c_shot,df
 
