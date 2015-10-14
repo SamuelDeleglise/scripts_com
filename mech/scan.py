@@ -34,4 +34,35 @@ def concat(pid):
     s=Series()
     for c in cs:
         s=s.append(c.data)
+    return s
+
+def sxrad(mod,rep,shot,therm):
+    '''return the sxrad/sxT ratio'''
+    return(rep.max()/mod.max()/therm[rep.argmax()])*shot.mean()
+
+
+def align(c_1, c_2):
+    '''align c_2 on c_1'''
+    try:
+        d = c_1.data.argmax()-c_2.data.argmax()
+        a = Series(data=c_2.data.values,index=d+c_2.data.index)
+    except AttributeError:
+        d = c_1.argmax()-c_2.argmax()
+        a = Series(data=c_2.values,index=d+c_2.index)
+    except:
+        raise
+    return a
+
+def scaledb(c_1,c_2):
+    '''scale c_2 on c_1, max are then the same'''
+    try:
+        d = c_1.data.max()-c_2.data.max()
+        a = Series(data=c_2.data.values+d,index=c_2.data.index)
+    except AttributeError:
+       d = c_1.max()-c_2.max()
+       a = Series(data=c_2.values+d,index=c_2.index)
+    except:
+        raise
+    return a
+
     
